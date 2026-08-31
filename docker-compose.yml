@@ -1,0 +1,42 @@
+services:
+
+  postgres:
+    image: postgres:18
+    container_name: hisably-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: hisably
+      POSTGRES_PASSWORD: hisably@123
+      POSTGRES_DB: hisably
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - hisably_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hisably -d hisably"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  redis:
+    image: redis:8-alpine
+    container_name: hisably-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - hisably_redis_data:/data
+
+    command: redis-server --appendonly yes
+
+
+volumes:
+  hisably_postgres_data:
+  hisably_redis_data:
