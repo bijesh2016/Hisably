@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ============================================================
+// USER / AUTHENTICATION
+// ============================================================
+
+model User {
+  id String @id @default(uuid())
+
+  firstName    String
+  lastName     String?
+  email        String  @unique
+  phone        String? @unique
+  passwordHash String
+
+  isActive      Boolean @default(true)
+  emailVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships OrganizationMember[]
+
+  @@index([email])
+}
+
+// ============================================================
+// ORGANIZATION / BUSINESS
+// ============================================================
+
+model Organization {
+  id String @id @default(uuid())
+
+  name String
+  slug String @unique
+
+  businessType String?
+
+  phone String?
+  email String?
+
+  address      String?
+  province     String?
+  district     String?
+  municipality String?
+
+  panNumber String?
+  vatNumber String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships OrganizationMember[]
+  branches    Branch[]
+  roles       Role[]
+}
+
+// ============================================================
+// ORGANIZATION MEMBERS
+// ============================================================
+
+model OrganizationMember {
+  id String @id @default(uuid())
+
+  organizationId String
+  userId         String
+
+  status MemberStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  roles        MemberRole[]
+  branchAccess MemberBranch[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+// ============================================================
+// BUSINESS BRANCHES
+// ============================================================
+
+model Branch {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name String
+  code String
+
+  phone String?
+  email String?
+
+  address      String?
+  province     String?
+  district     String?
+  municipality String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  members MemberBranch[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+// ============================================================
+// ROLES
+// ============================================================
+
+model Role {
+  id String @id @default(uuid())
+
+  organizationId String?
+
+  name        String
+  description String?
+
+  isSystemRole Boolean @default(false)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  memberRoles MemberRole[]
+  permissions RolePermission[]
+
+  @@index([organizationId])
+}
+
+// ============================================================
+// PERMISSIONS
+// ============================================================
+
+model Permission {
+  id String @id @default(uuid())
+
+  key         String  @unique
+  name        String
+  description String?
+
+  roles RolePermission[]
+}
+
+// ============================================================
+// MEMBER ↔ ROLE
+// ============================================================
+
+model MemberRole {
+  id String @id @default(uuid())
+
+  memberId String
+  roleId   String
+
+  member OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, roleId])
+  @@index([memberId])
+  @@index([roleId])
+}
+
+// ============================================================
+// ROLE ↔ PERMISSION
+// ============================================================
+
+model RolePermission {
+  id String @id @default(uuid())
+
+  roleId       String
+  permissionId String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+// ============================================================
+// MEMBER ↔ BRANCH
+// ============================================================
+
+model MemberBranch {
+  id String @id @default(uuid())
+
+  memberId String
+  branchId String
+
+  member OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, branchId])
+  @@index([memberId])
+  @@index([branchId])
+}
