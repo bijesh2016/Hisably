@@ -16,6 +16,91 @@ enum MemberStatus {
   SUSPENDED
 }
 
+enum ProductType {
+  GOODS
+  SERVICE
+  COMPOSITE
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  SALE_RETURN
+  PURCHASE_RETURN
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+  OPENING_STOCK
+}
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum SupplierType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  RECEIVED
+  PARTIALLY_RECEIVED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CONNECT_IPS
+  ESEWA
+  KHALTI
+  IME_PAY
+  QR
+  CARD
+  CREDIT
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PurchaseReturnStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+enum SaleStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+enum SaleReturnStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
 // ============================================================
 // USER / AUTHENTICATION
 // ============================================================
@@ -67,10 +152,27 @@ model Organization {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   memberships OrganizationMember[]
   branches    Branch[]
   roles       Role[]
+
+  categories     Category[]
+  brands         Brand[]
+  units          Unit[]
+  products       Product[]
+  warehouses     Warehouse[]
+  stockTransfers StockTransfer[]
+
+  customers Customer[]
+  suppliers Supplier[]
+
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+
+  sales       Sale[]
+  saleReturns SaleReturn[]
 }
 
 // ============================================================
@@ -124,10 +226,17 @@ model Branch {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  members MemberBranch[]
+  members         MemberBranch[]
+  warehouses      Warehouse[]
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+
+  sales       Sale[]
+  saleReturns SaleReturn[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -146,6 +255,10 @@ model Role {
   description String?
 
   isSystemRole Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -224,4 +337,815 @@ model MemberBranch {
   @@unique([memberId, branchId])
   @@index([memberId])
   @@index([branchId])
+}
+
+//Category
+model Category {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name        String
+  description String?
+
+  parentId String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  parent Category? @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([parentId])
+}
+
+//BRANDS
+model Brand {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name        String
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  products Product[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+//UNIT
+model Unit {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name         String
+  abbreviation String
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  products Product[]
+
+  @@unique([organizationId, abbreviation])
+  @@index([organizationId])
+}
+
+//PRODUCT
+model Product {
+  id String @id @default(uuid())
+
+  organizationId String
+  categoryId     String?
+  brandId        String?
+  unitId         String
+
+  name    String
+  sku     String?
+  barcode String?
+
+  description String?
+
+  productType ProductType @default(GOODS)
+
+  costPrice    Decimal @db.Decimal(14, 2)
+  sellingPrice Decimal @db.Decimal(14, 2)
+
+  taxRate Decimal @default(0) @db.Decimal(5, 2)
+
+  trackInventory Boolean @default(true)
+  trackSerial    Boolean @default(false)
+
+  minStock Decimal? @db.Decimal(14, 3)
+  maxStock Decimal? @db.Decimal(14, 3)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  brand Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  variants            ProductVariant[]
+  stock               Stock[]
+  stockMovements      StockMovement[]
+  transferItems       StockTransferItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+  saleItems           SaleItem[]
+  saleReturnItems     SaleReturnItem[]
+
+  @@unique([organizationId, sku])
+  @@unique([organizationId, barcode])
+  @@index([organizationId])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([name])
+}
+
+//PRODUCT_VARIANT
+model ProductVariant {
+  id String @id @default(uuid())
+
+  productId String
+
+  name String
+
+  sku     String?
+  barcode String?
+
+  attributes Json?
+
+  costPrice    Decimal? @db.Decimal(14, 2)
+  sellingPrice Decimal? @db.Decimal(14, 2)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  stock               Stock[]
+  stockMovements      StockMovement[]
+  transferItems       StockTransferItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+  saleItems           SaleItem[]
+  saleReturnItems     SaleReturnItem[]
+
+  @@unique([productId, name])
+  @@unique([productId, sku])
+  @@unique([productId, barcode])
+  @@index([productId])
+}
+
+//WAREHOUSE
+model Warehouse {
+  id String @id @default(uuid())
+
+  organizationId String
+  branchId       String
+
+  name String
+  code String
+
+  address String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  stock     Stock[]
+  movements StockMovement[]
+
+  outgoingTransfers StockTransfer[] @relation("TransferFrom")
+  incomingTransfers StockTransfer[] @relation("TransferTo")
+
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+
+  sales       Sale[]
+  saleReturns SaleReturn[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([branchId])
+}
+
+//STOCKS
+model Stock {
+  id String @id @default(uuid())
+
+  warehouseId String
+  productId   String
+  variantId   String?
+
+  quantity Decimal @default(0) @db.Decimal(14, 3)
+
+  reservedQty Decimal @default(0) @db.Decimal(14, 3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, productId, variantId])
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+//STOCK_MOVEMENT
+model StockMovement {
+  id String @id @default(uuid())
+
+  warehouseId String
+  productId   String
+  variantId   String?
+
+  type StockMovementType
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  referenceId String?
+  note        String?
+
+  createdAt DateTime @default(now())
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+//STOCK_TRANSFER
+model StockTransfer {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  fromWarehouseId String
+  toWarehouseId   String
+
+  status TransferStatus @default(PENDING)
+
+  note String?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fromWarehouse Warehouse @relation("TransferFrom", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+
+  toWarehouse Warehouse @relation("TransferTo", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+
+  items StockTransferItem[]
+
+  @@index([organizationId])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
+  @@index([status])
+}
+
+model StockTransferItem {
+  id String @id @default(uuid())
+
+  transferId String
+
+  productId String
+  variantId String?
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([transferId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+//CUSTOMER
+model Customer {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name         String
+  customerCode String?
+
+  type CustomerType @default(INDIVIDUAL)
+
+  phone String?
+  email String?
+
+  panNumber String?
+
+  creditLimit Decimal @default(0) @db.Decimal(14, 2)
+
+  status PartyStatus @default(ACTIVE)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  addresses CustomerAddress[]
+
+  sales       Sale[]
+  saleReturns SaleReturn[]
+
+  @@unique([organizationId, customerCode])
+  @@index([organizationId])
+  @@index([phone])
+  @@index([name])
+}
+
+//CUSTOMER_ADDRESS
+model CustomerAddress {
+  id String @id @default(uuid())
+
+  customerId String
+
+  label   String?
+  address String
+
+  province     String?
+  district     String?
+  municipality String?
+  ward         String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+//SUPPLIER
+model Supplier {
+  id String @id @default(uuid())
+
+  organizationId String
+
+  name         String
+  supplierCode String?
+
+  type SupplierType @default(BUSINESS)
+
+  phone String?
+  email String?
+
+  panNumber String?
+  vatNumber String?
+
+  creditLimit Decimal @default(0) @db.Decimal(14, 2)
+
+  status PartyStatus @default(ACTIVE)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  contacts        SupplierContact[]
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+
+  @@unique([organizationId, supplierCode])
+  @@index([organizationId])
+  @@index([phone])
+  @@index([name])
+}
+
+//SUPPLIER_CONTACT
+model SupplierContact {
+  id String @id @default(uuid())
+
+  supplierId String
+
+  name        String
+  designation String?
+
+  phone String?
+  email String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+//PURCHASE
+model Purchase {
+  id String @id @default(uuid())
+
+  organizationId String
+  supplierId     String
+  branchId       String
+  warehouseId    String
+
+  invoiceNumber String?
+  purchaseDate  DateTime @default(now())
+
+  status        PurchaseStatus @default(DRAFT)
+  paymentStatus PaymentStatus  @default(UNPAID)
+
+  subtotal    Decimal @default(0) @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  paidAmount Decimal @default(0) @db.Decimal(14, 2)
+  dueAmount  Decimal @default(0) @db.Decimal(14, 2)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  items    PurchaseItem[]
+  payments PurchasePayment[]
+  returns  PurchaseReturn[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([branchId])
+  @@index([warehouseId])
+  @@index([purchaseDate])
+  @@index([status])
+  @@index([paymentStatus])
+}
+
+//PURCHASE_ITEMS
+model PurchaseItem {
+  id String @id @default(uuid())
+
+  purchaseId String
+
+  productId String
+  variantId String?
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  unitCost Decimal @db.Decimal(14, 2)
+
+  discount  Decimal @default(0) @db.Decimal(14, 2)
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+//PURCHASE_PAYMENT 
+model PurchasePayment {
+  id String @id @default(uuid())
+
+  purchaseId String
+
+  amount Decimal @db.Decimal(14, 2)
+
+  method PaymentMethod
+
+  reference String?
+  notes     String?
+
+  paymentDate DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([paymentDate])
+  @@index([method])
+}
+
+//PURCHASE_RETURN
+model PurchaseReturn {
+  id String @id @default(uuid())
+
+  organizationId String
+  purchaseId     String
+  supplierId     String
+  branchId       String
+  warehouseId    String
+
+  returnNumber String?
+  returnDate   DateTime @default(now())
+
+  status PurchaseReturnStatus @default(DRAFT)
+
+  subtotal    Decimal @default(0) @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  items PurchaseReturnItem[]
+
+  @@unique([organizationId, returnNumber])
+  @@index([organizationId])
+  @@index([purchaseId])
+  @@index([supplierId])
+  @@index([branchId])
+  @@index([warehouseId])
+  @@index([returnDate])
+  @@index([status])
+}
+
+//PURCHASE_RETURN_ITEM
+model PurchaseReturnItem {
+  id String @id @default(uuid())
+
+  purchaseReturnId String
+
+  productId String
+  variantId String?
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  unitCost Decimal @db.Decimal(14, 2)
+
+  discount  Decimal @default(0) @db.Decimal(14, 2)
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseReturnId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+//SALE
+model Sale {
+  id String @id @default(uuid())
+
+  organizationId String
+  customerId     String?
+  branchId       String
+  warehouseId    String
+
+  saleNumber String
+  saleDate   DateTime @default(now())
+
+  status        SaleStatus    @default(DRAFT)
+  paymentStatus PaymentStatus @default(UNPAID)
+
+  subtotal    Decimal @default(0) @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  paidAmount Decimal @default(0) @db.Decimal(14, 2)
+  dueAmount  Decimal @default(0) @db.Decimal(14, 2)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  items    SaleItem[]
+  payments SalePayment[]
+  returns  SaleReturn[]
+
+  @@unique([organizationId, saleNumber])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([branchId])
+  @@index([warehouseId])
+  @@index([saleDate])
+  @@index([status])
+  @@index([paymentStatus])
+}
+
+//SALE_ITEM
+model SaleItem {
+  id String @id @default(uuid())
+
+  saleId String
+
+  productId String
+  variantId String?
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  unitPrice Decimal @db.Decimal(14, 2)
+
+  discount  Decimal @default(0) @db.Decimal(14, 2)
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+//SALE_PAYMENT
+model SalePayment {
+  id String @id @default(uuid())
+
+  saleId String
+
+  amount Decimal @db.Decimal(14, 2)
+
+  method PaymentMethod
+
+  reference String?
+  notes     String?
+
+  paymentDate DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([paymentDate])
+  @@index([method])
+}
+
+//SALE_RETURN
+model SaleReturn {
+  id String @id @default(uuid())
+
+  organizationId String
+  saleId         String
+  customerId     String?
+
+  branchId    String
+  warehouseId String
+
+  returnNumber String
+  returnDate   DateTime @default(now())
+
+  status SaleReturnStatus @default(DRAFT)
+
+  subtotal    Decimal @default(0) @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
+  totalAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  items SaleReturnItem[]
+
+  @@unique([organizationId, returnNumber])
+  @@index([organizationId])
+  @@index([saleId])
+  @@index([customerId])
+  @@index([branchId])
+  @@index([warehouseId])
+  @@index([returnDate])
+  @@index([status])
+}
+
+//SALE_RETURN_ITEM
+model SaleReturnItem {
+  id String @id @default(uuid())
+
+  saleReturnId String
+
+  productId String
+  variantId String?
+
+  quantity Decimal @db.Decimal(14, 3)
+
+  unitPrice Decimal @db.Decimal(14, 2)
+
+  discount  Decimal @default(0) @db.Decimal(14, 2)
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+
+  totalAmount Decimal @db.Decimal(14, 2)
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([saleReturnId])
+  @@index([productId])
+  @@index([variantId])
 }
