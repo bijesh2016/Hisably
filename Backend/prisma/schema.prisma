@@ -117,10 +117,15 @@ model User {
   isActive      Boolean @default(true)
   emailVerified Boolean @default(false)
 
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpiry    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships OrganizationMember[]
+  memberships   OrganizationMember[]
+  notifications Notification[]
 
   @@index([email])
 }
@@ -173,6 +178,10 @@ model Organization {
 
   sales       Sale[]
   saleReturns SaleReturn[]
+
+  expenses      Expense[]
+  payments      Payment[]
+  notifications Notification[]
 }
 
 // ============================================================
@@ -237,6 +246,9 @@ model Branch {
 
   sales       Sale[]
   saleReturns SaleReturn[]
+
+  expenses Expense[]
+  payments Payment[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -1149,3 +1161,94 @@ model SaleReturnItem {
   @@index([productId])
   @@index([variantId])
 }
+
+// ============================================================
+// EXPENSES
+// ============================================================
+
+model Expense {
+  id String @id @default(uuid())
+
+  organizationId String
+  branchId       String?
+  categoryId     String?
+
+  title         String
+  amount        Decimal       @db.Decimal(14, 2)
+  expenseDate   DateTime      @default(now())
+  paymentMethod PaymentMethod @default(CASH)
+
+  status     String  @default("APPROVED")
+  receiptUrl String?
+  notes      String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([expenseDate])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id String @id @default(uuid())
+
+  organizationId String
+  branchId       String?
+
+  type        String        @default("INCOMING")
+  amount      Decimal       @db.Decimal(14, 2)
+  method      PaymentMethod @default(CASH)
+  reference   String?
+  status      String        @default("COMPLETED")
+  paymentDate DateTime      @default(now())
+  notes       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([paymentDate])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id String @id @default(uuid())
+
+  userId         String
+  organizationId String?
+
+  title   String
+  message String
+  type    String  @default("INFO")
+  read    Boolean @default(false)
+  readAt  DateTime?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([read])
+}
+
